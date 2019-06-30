@@ -4,7 +4,7 @@ from keras.datasets import mnist
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.convolutional import UpSampling1D, Conv1D
+from keras.layers.convolutional import UpSampling1D, Conv1D, UpSampling2D
 from keras.models import Sequential, Model
 from keras.optimizers import Adam
 
@@ -105,10 +105,10 @@ class DCGAN():
         self.discriminator.compile(loss='binary_crossentropy',
             optimizer=optimizer,
             metrics=['accuracy'])
-
+        print("Discriminator built")
         # Build the generator
         self.generator = self.build_generator()
-
+        print("Generator built")
         # The generator takes noise as input and generates imgs
         z = Input(shape=(self.latent_dim,))
         img = self.generator(z)
@@ -123,31 +123,36 @@ class DCGAN():
         # Trains the generator to fool the discriminator
         self.combined = Model(z, valid)
         self.combined.compile(loss='binary_crossentropy', optimizer=optimizer)
+        
 
     def build_generator(self):
 
         model = Sequential()
-
         model.add(Dense(1 * 55125, activation="relu", input_dim=self.latent_dim))
         model.add(Reshape((55125, 1)))
         model.add(Conv1D(128, kernel_size=7, padding="same"))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Activation("relu"))
-        model.add(UpSampling1D())
+        model.add(Reshape((55125, 1, 128)))
+        model.add(UpSampling2D(size=(2, 1)))
+        model.add(Reshape((110250, 128)))
         model.add(Conv1D(128, kernel_size=7, padding="same"))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Activation("relu"))
-        model.add(UpSampling1D())
+        model.add(Reshape((110250, 1, 128)))
+        model.add(UpSampling2D(size=(2, 1)))
+        model.add(Reshape((220500, 128)))
         model.add(Conv1D(64, kernel_size=7, padding="same"))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Activation("relu"))
-        model.add(UpSampling1D())
+        model.add(Reshape((220500, 1, 64)))
+        model.add(UpSampling2D(size=(2, 1)))
+        model.add(Reshape((441000, 64)))
         model.add(Conv1D(32, kernel_size=7, padding="same"))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Activation("relu"))
         model.add(Conv1D(self.channels, kernel_size=7, padding="same"))
         model.add(Activation("sigmoid"))
-
         model.summary()
 
         noise = Input(shape=(self.latent_dim,))
@@ -187,7 +192,7 @@ class DCGAN():
 
     def train(self, epochs):
 
-        self.bg.data = np.expand_dims(self.bg.data, axis=3)
+        #self.bg.data = np.expand_dims(self.bg.data, axis=3)
 
         # Adversarial ground truths
         valid = np.ones((self.batch_size, 1))
@@ -236,30 +241,12 @@ class DCGAN():
             path = self.outputdir + "sample{}".format(epoch) + "_{}.wav".format(i)
             self.bg.save_bytes_to_wav(byte_list, path)
 
-    def save_imgs(self, epoch):
-        r, c = 5, 5
-        noise = np.random.normal(0, 1, (r * c, self.latent_dim))
-        gen_imgs = self.generator.predict(noise)
-
-        # Rescale images 0 - 1
-        gen_imgs = 0.5 * gen_imgs + 0.5
-
-        fig, axs = plt.subplots(r, c)
-        cnt = 0
-        for i in range(r):
-            for j in range(c):
-                axs[i,j].imshow(gen_imgs[cnt, :,:,0], cmap='gray')
-                axs[i,j].axis('off')
-                cnt += 1
-        fig.savefig("images/mnist_%d.png" % epoch)
-        plt.close()
-
 def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("inputdir", help="Directory containing audio samples")
     parser.add_argument("outputdir", help="Directory to output samples during training")
-    parser.add_argument("--batchsize", type=int, default=128, help="Batch size used during training")
+    parser.add_argument("--batchsize", type=int, default=32, help="Batch size used during training")
     parser.add_argument("--interval", type=int, default=50, help="Interval between saving samples during training")
     parser.add_argument("--modelfile", help="File to save model at after training")
     parser.add_argument("--epochs", type=int, default=1000, help="Number of training epochs")
