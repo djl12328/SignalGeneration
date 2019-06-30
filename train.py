@@ -4,7 +4,7 @@ from keras.datasets import mnist
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.convolutional import UpSampling1D, Conv1D, UpSampling2D
+from keras.layers.convolutional import UpSampling1D, Conv1D, UpSampling2D, MaxPooling1D
 from keras.models import Sequential, Model
 from keras.optimizers import Adam
 
@@ -128,8 +128,14 @@ class DCGAN():
     def build_generator(self):
 
         model = Sequential()
-        model.add(Dense(1 * 55125, activation="relu", input_dim=self.latent_dim))
-        model.add(Reshape((55125, 1)))
+        model.add(Dense(1 * 11025, activation="relu", input_dim=self.latent_dim))
+        model.add(Reshape((11025, 1)))
+        model.add(Conv1D(256, kernel_size=7, padding="same"))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(Activation("relu"))
+        model.add(Reshape((11025, 1, 256)))
+        model.add(UpSampling2D(size=(5, 1)))
+        model.add(Reshape((55125, 256)))
         model.add(Conv1D(128, kernel_size=7, padding="same"))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Activation("relu"))
@@ -180,6 +186,7 @@ class DCGAN():
         model.add(BatchNormalization(momentum=0.8))
         model.add(LeakyReLU(alpha=0.2))
         model.add(Dropout(0.25))
+        model.add(MaxPooling1D(pool_size=2, padding="valid"))
         model.add(Flatten())
         model.add(Dense(1, activation='sigmoid'))
 
@@ -246,8 +253,8 @@ def main():
 
     parser.add_argument("inputdir", help="Directory containing audio samples")
     parser.add_argument("outputdir", help="Directory to output samples during training")
-    parser.add_argument("--batchsize", type=int, default=32, help="Batch size used during training")
-    parser.add_argument("--interval", type=int, default=50, help="Interval between saving samples during training")
+    parser.add_argument("--batchsize", type=int, default=8, help="Batch size used during training")
+    parser.add_argument("--interval", type=int, default=10, help="Interval between saving samples during training")
     parser.add_argument("--modelfile", help="File to save model at after training")
     parser.add_argument("--epochs", type=int, default=1000, help="Number of training epochs")
 
